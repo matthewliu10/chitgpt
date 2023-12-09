@@ -32,7 +32,9 @@ impl Brain {
             if let Some(next_words) = self.words.get(last_word) {
                 let next_words: Vec<_> = next_words.iter().collect();
 
-                let next_word = next_words.choose_weighted(&mut rng, |(_word, frequency)| *frequency).unwrap();
+                let next_word = next_words
+                    .choose_weighted(&mut rng, |(_word, frequency)| *frequency)
+                    .unwrap();
 
                 out.push(next_word.0.to_string());
             } else {
