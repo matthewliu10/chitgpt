@@ -3,7 +3,7 @@ use self::brain::*;
 mod brain;
 
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
+use std::{collections::HashMap, iter};
 
 fn main() {
     let mut brain = Brain::default();
