@@ -9,7 +9,7 @@ pub struct Brain {
     token_to_id: HashMap<Token, TokenId>,
     id_to_token: HashMap<TokenId, Token>,
     next_id: TokenId,
-    frequencies: HashMap<TokenId, HashMap<TokenId, TokenFrequency>>,
+    frequencies: HashMap<Vec<TokenId>, HashMap<TokenId, TokenFrequency>>,
 }
 
 impl Brain {
@@ -18,7 +18,7 @@ impl Brain {
     }
 
     fn train_tokens<'a>(&mut self, tokens: impl Iterator<Item = &'a str>) {
-        let mut prev_token = None;
+        let mut context = Vec::new();
 
         for token in tokens {
             if !self.token_to_id.contains_key(token) {
@@ -26,13 +26,19 @@ impl Brain {
             }
             let token = *self.token_to_id.get(token).unwrap();
             
-            if let Some(prev_token) = prev_token.replace(token) {
+            if let &[c1, c2, c3, c4] = context.as_slice() {
                 *self
                     .frequencies
-                    .entry(prev_token)
+                    .entry(vec![c1, c2, c3, c4])
                     .or_default()
                     .entry(token)
                     .or_default() += 1;
+            }
+
+            context.push(token);
+
+            if context.len() > 4 {
+                context.remove(0);
             }
         }
     }
@@ -43,9 +49,14 @@ impl Brain {
         let mut rng = rand::thread_rng();
 
         while out.len() < length {
-            let last_token_id = out.last().unwrap();
+            let context = vec![
+                out[out.len() - 4].clone(),
+                out[out.len() - 3].clone(),
+                out[out.len() - 2].clone(),
+                out[out.len() - 1].clone(),
+            ];
 
-            if let Some(next_tokens_ids) = self.frequencies.get(last_token_id) {
+            if let Some(next_tokens_ids) = self.frequencies.get(&context) {
                 let next_token_ids: Vec<_> = next_tokens_ids.iter().collect();
 
                 let next_token_id = next_token_ids
