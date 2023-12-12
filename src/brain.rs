@@ -4,6 +4,8 @@ type Token = String;
 type TokenId = usize;
 type TokenFrequency = usize;
 
+const MAX_CONTENT_SIZE: usize = 5;
+
 #[derive(Default)]
 pub struct Brain {
     token_to_id: HashMap<Token, TokenId>,
@@ -18,18 +20,22 @@ impl Brain {
     }
 
     fn train_tokens<'a>(&mut self, tokens: impl Iterator<Item = &'a str>) {
-        let mut context = Vec::new();
+        let mut context: Vec<usize> = Vec::new();
 
         for token in tokens {
             if !self.token_to_id.contains_key(token) {
                 self.add_token(token);
             }
             let token = *self.token_to_id.get(token).unwrap();
-            
-            if let &[c1, c2, c3, c4] = context.as_slice() {
+
+            for cs in 1..=context.len() {
+                let context: Vec<_> = context[(context.len() - cs)..context.len()]
+                    .iter()
+                    .map(|token_id| token_id.clone())
+                    .collect();
                 *self
                     .frequencies
-                    .entry(vec![c1, c2, c3, c4])
+                    .entry(context)
                     .or_default()
                     .entry(token)
                     .or_default() += 1;
@@ -37,39 +43,63 @@ impl Brain {
 
             context.push(token);
 
-            if context.len() > 4 {
+            if context.len() > MAX_CONTENT_SIZE {
                 context.remove(0);
             }
         }
     }
 
     pub fn prompt(&self, prompt: &str, length: usize) -> String {
-        let mut out: Vec<_> = Self::tokenize(prompt).map(|token| self.token_to_id.get(token).expect("unknown token in prompt")).collect();
+        let mut out: Vec<_> = Self::tokenize(prompt)
+            .map(|token| {
+                self.token_to_id
+                    .get(token)
+                    .expect("unknown token in prompt")
+                    .clone()
+            })
+            .collect();
 
         let mut rng = rand::thread_rng();
 
         while out.len() < length {
-            let context = vec![
-                out[out.len() - 4].clone(),
-                out[out.len() - 3].clone(),
-                out[out.len() - 2].clone(),
-                out[out.len() - 1].clone(),
-            ];
+            let mut next_token_id = None;
 
-            if let Some(next_tokens_ids) = self.frequencies.get(&context) {
-                let next_token_ids: Vec<_> = next_tokens_ids.iter().collect();
+            for cs in (1..=MAX_CONTENT_SIZE).rev() {
+                if cs > out.len() {
+                    continue;
+                }
 
-                let next_token_id = next_token_ids
-                    .choose_weighted(&mut rng, |(_token_id, frequency)| *frequency)
-                    .unwrap();
+                let context: Vec<_> = out[(out.len() - cs)..out.len()]
+                    .iter()
+                    .map(|token_id| token_id.clone())
+                    .collect();
 
-                out.push(next_token_id.0);
+                if let Some(next_tokens_ids) = self.frequencies.get(&context) {
+                    let next_token_ids: Vec<_> = next_tokens_ids.iter().collect();
+
+                    next_token_id = Some(
+                        next_token_ids
+                            .choose_weighted(&mut rng, |(_token_id, frequency)| *frequency)
+                            .unwrap()
+                            .0
+                            .clone(),
+                    );
+
+                    break;
+                }
+            }
+
+            if let Some(next_token_id) = next_token_id {
+                out.push(next_token_id);
             } else {
                 break;
             }
         }
 
-        let out: Vec<String> = out.into_iter().map(|id| self.id_to_token.get(id).unwrap().clone()).collect();
+        let out: Vec<String> = out
+            .into_iter()
+            .map(|id| self.id_to_token.get(&id).unwrap().clone())
+            .collect();
 
         out.join("")
     }

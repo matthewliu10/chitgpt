@@ -8,7 +8,7 @@ use std::{collections::HashMap, iter};
 fn main() {
     let mut brain = Brain::default();
 
-    brain.train(include_str!("../chatgpt.txt"));
+    brain.train(include_str!("../crime-and-punishment.txt"));
 
-    println!("{}", brain.prompt("ChatGPT is a", 64));
+    println!("{}", brain.prompt("CHAPTER II", 256));
 }
